@@ -11,12 +11,19 @@ function flatten(arr) {
 
 const EXTENSIONS = [".js", ".ts", ".tsx", ".jsx", ".css", ".less", ".scss"];
 
-function extract(file, visited = {}) {
+function extract(file, output, visited = {}) {
+  try {
+    fs.statSync(file);
+  } catch (e) {
+    return [];
+  }
+
   const data = fs.readFileSync(file, "utf8");
 
   const files = [];
   const dirname = path.resolve(__dirname, path.dirname(file));
   const qualifiedFileName = path.resolve(__dirname, file);
+  const qualifiedOutput = path.resolve(__dirname, output);
 
   if (visited[qualifiedFileName]) {
     return [];
@@ -34,6 +41,15 @@ function extract(file, visited = {}) {
   const MODULE_IMPORT = /import.*?from\s+?[\"'](.*?)[\"']/g;
   for (const str of data.match(MODULE_IMPORT) || []) {
     const groups = MODULE_IMPORT.exec(str);
+
+    if (groups && groups.length > 0) {
+      files.push(path.join(dirname, groups[1]));
+    }
+  }
+
+  const REQUIRE_IMPORT = /require\s*?\(\s*?[\"'](.*?)[\"']\s*?\)/g;
+  for (const str of data.match(REQUIRE_IMPORT) || []) {
+    const groups = REQUIRE_IMPORT.exec(str);
 
     if (groups && groups.length > 0) {
       files.push(path.join(dirname, groups[1]));
@@ -64,10 +80,21 @@ function extract(file, visited = {}) {
   const items = [];
 
   [...new Set(filtered).values()].forEach(item => {
-    items.push(item, extract(item, visited));
+    items.push(item, extract(item, qualifiedOutput, visited));
   });
 
   return [...new Set(flatten(items)).values()];
 }
 
-console.log(extract("./test/color.js"));
+try {
+  fs.unlinkSync("./output");
+} catch (e) {
+  // ignore
+}
+
+console.log(
+  extract(
+    "/Users/mkurian/workspace/EKGDashboard/app/dashboard/Dashboard.js",
+    "./output"
+  )
+);
